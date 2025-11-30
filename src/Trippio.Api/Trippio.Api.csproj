@@ -10,11 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="appsettings.json" Condition="Exists('appsettings.json')">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
-    <Content Include="appsettings.Development.json" Condition="Exists('appsettings.Development.json')">
+    <Content Update="appsettings*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

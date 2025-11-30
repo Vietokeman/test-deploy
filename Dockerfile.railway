@@ -16,9 +16,9 @@ ARG APPSETTINGS_JSON
 RUN API_PROJECT=$(find . -name "*.csproj" | grep -i "Api" | head -n 1) && \
     API_DIR=$(dirname "$API_PROJECT") && \
     if [ -n "$APPSETTINGS_JSON" ]; then \
-        echo "$APPSETTINGS_JSON" > "$API_DIR/appsettings.json"; \
+        echo "$APPSETTINGS_JSON" > "$API_DIR/appsettings.Production.json"; \
     else \
-        echo '{"Logging":{"LogLevel":{"Default":"Information","Microsoft.AspNetCore":"Warning"}},"AllowedHosts":"*"}' > "$API_DIR/appsettings.json"; \
+        echo '{"Logging":{"LogLevel":{"Default":"Information","Microsoft.AspNetCore":"Warning"}},"AllowedHosts":"*"}' > "$API_DIR/appsettings.Production.json"; \
     fi && \
     dotnet publish "$API_PROJECT" -c Release -o /app/publish /p:UseAppHost=false
 

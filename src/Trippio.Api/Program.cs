@@ -40,7 +40,9 @@ internal class Program
     {
         Log.Logger = new LoggerConfiguration()
             .ReadFrom.Configuration(new ConfigurationBuilder()
-                .AddJsonFile("appsettings.json")
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .AddJsonFile("appsettings.Production.json", optional: true, reloadOnChange: true)
+                .AddEnvironmentVariables()
                 .Build())
             .Enrich.FromLogContext()
             .CreateLogger();
