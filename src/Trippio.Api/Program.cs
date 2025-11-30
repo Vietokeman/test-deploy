@@ -52,6 +52,18 @@ internal class Program
             Log.Information("Starting web host");
 
             var builder = WebApplication.CreateBuilder(args);
+            
+            // ===== RAILWAY PORT CONFIGURATION =====
+            // Railway provides PORT via environment variable, we MUST use it
+            var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+            builder.WebHost.ConfigureKestrel(serverOptions =>
+            {
+                // Listen on 0.0.0.0 (all interfaces) NOT localhost
+                // This is CRITICAL for Railway to route traffic to your app
+                serverOptions.ListenAnyIP(int.Parse(port));
+            });
+            Log.Information($"Configured to listen on 0.0.0.0:{port}");
+            
             var configuration = builder.Configuration;
             var connectionString = configuration.GetConnectionString("DefaultConnection");
             var VietokemanPolicy = "VietokemanPolicy";

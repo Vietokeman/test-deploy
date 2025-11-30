@@ -1,26 +1,40 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
+# Railway will provide PORT via env var - we expose it here for documentation
 EXPOSE 8080
 ENV ASPNETCORE_ENVIRONMENT=Production
+# Disable HTTPS redirection in Production (Railway handles SSL at edge)
+ENV ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY src/ .
-RUN dotnet restore $(find . -name "*.csproj" | grep -i "Api" | head -n 1)
-RUN dotnet build $(find . -name "*.csproj" | grep -i "Api" | head -n 1) -c Release -o /app/build
+
+# Find and restore the API project
+RUN API_PROJECT=$(find . -name "*.csproj" | grep -i "Api" | head -n 1) && \
+    echo "Found API project: $API_PROJECT" && \
+    dotnet restore "$API_PROJECT"
+
+# Build the project
+RUN API_PROJECT=$(find . -name "*.csproj" | grep -i "Api" | head -n 1) && \
+    dotnet build "$API_PROJECT" -c Release -o /app/build
 
 FROM build AS publish
-ARG APPSETTINGS_JSON
+# Publish the application
 RUN API_PROJECT=$(find . -name "*.csproj" | grep -i "Api" | head -n 1) && \
-    API_DIR=$(dirname "$API_PROJECT") && \
-    if [ -n "$APPSETTINGS_JSON" ]; then \
-        echo "$APPSETTINGS_JSON" > "$API_DIR/appsettings.Production.json"; \
-    else \
-        echo '{"Logging":{"LogLevel":{"Default":"Information","Microsoft.AspNetCore":"Warning"}},"AllowedHosts":"*"}' > "$API_DIR/appsettings.Production.json"; \
-    fi && \
     dotnet publish "$API_PROJECT" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-CMD ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet Trippio.Api.dll
+
+# Install curl for Railway health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Health check endpoint - Railway will use this
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
+
+# CRITICAL: Use PORT from Railway environment variable
+# Listen on 0.0.0.0 (all interfaces) so Railway can route traffic
+CMD ASPNETCORE_URLS=http://0.0.0.0:${PORT:-8080} dotnet Trippio.Api.dll
