@@ -1,60 +1,33 @@
-# Dockerfile tối ưu cho Railway deployment
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
-# Railway tự động assign PORT, expose all ports
-EXPOSE 8080
-ENV ASPNETCORE_URLS=http://+:8080
+ARG PORT=8080
+ENV PORT=${PORT}
+ENV ASPNETCORE_URLS=http://+:${PORT}
+EXPOSE ${PORT}
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-
-# Copy project files
-COPY ["src/Trippio.Api/Trippio.Api.csproj", "Trippio.Api/"]
-COPY ["src/Trippio.Core/Trippio.Core.csproj", "Trippio.Core/"]
-COPY ["src/Trippio.Data/Trippio.Data.csproj", "Trippio.Data/"]
-
-# Restore dependencies
-RUN dotnet restore "Trippio.Api/Trippio.Api.csproj"
-
-# Copy all source code
 COPY src/ .
-
-# Build
-WORKDIR "/src/Trippio.Api"
-RUN dotnet build "Trippio.Api.csproj" -c Release -o /app/build
+RUN dotnet restore $(find . -name "*.csproj" | grep -i "Api" | head -n 1)
+RUN dotnet build $(find . -name "*.csproj" | grep -i "Api" | head -n 1) -c Release -o /app/build
 
 FROM build AS publish
-# Tạo appsettings.json trực tiếp trong container (không cần từ git)
-RUN echo '{ \
-  "Logging": { \
-    "LogLevel": { \
-      "Default": "Information", \
-      "Microsoft.AspNetCore": "Warning" \
-    } \
-  }, \
-  "AllowedHosts": "*", \
-  "ConnectionStrings": { \
-    "DefaultConnection": "" \
-  }, \
-  "JwtTokenSettings": { \
-    "Key": "", \
-    "Issuer": "", \
-    "ExpireInHours": 24 \
-  } \
-}' > /src/Trippio.Api/appsettings.json && \
-    echo "Created appsettings.json in container"
-
-RUN dotnet publish "Trippio.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+ARG APPSETTINGS_JSON
+RUN API_PROJECT=$(find . -name "*.csproj" | grep -i "Api" | head -n 1) && \
+    API_DIR=$(dirname "$API_PROJECT") && \
+    if [ -n "$APPSETTINGS_JSON" ]; then \
+        echo "$APPSETTINGS_JSON" > "$API_DIR/appsettings.json"; \
+    else \
+        echo '{"Logging":{"LogLevel":{"Default":"Information","Microsoft.AspNetCore":"Warning"}},"AllowedHosts":"*"}' > "$API_DIR/appsettings.json"; \
+    fi && \
+    dotnet publish "$API_PROJECT" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-
-# Install curl và wget cho health checks
-RUN apt-get update && apt-get install -y curl wget && rm -rf /var/lib/apt/lists/*
-
-# Health check endpoint
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
-
-ENTRYPOINT ["dotnet", "Trippio.Api.dll"]
+RUN API_DLL=$(find . -maxdepth 1 -name "*Api*.dll" | head -n 1 | xargs basename) && \
+    echo "#!/bin/sh" > /app/entrypoint.sh && \
+    echo "export ASPNETCORE_URLS=http://+:\${PORT:-8080}" >> /app/entrypoint.sh && \
+    echo "exec dotnet $API_DLL \"\$@\"" >> /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
