@@ -25,11 +25,7 @@ RUN if [ -n "$APPSETTINGS_JSON" ]; then \
         echo "$APPSETTINGS_JSON" > Trippio.Api/appsettings.json; \
         echo "Generated appsettings.json from environment variable"; \
     else \
-        echo "No APPSETTINGS_JSON provided, checking if file exists"; \
-        if [ ! -f "Trippio.Api/appsettings.json" ]; then \
-            echo "Creating minimal appsettings.json"; \
-            echo '{"Logging":{"LogLevel":{"Default":"Information"}},"AllowedHosts":"*"}' > Trippio.Api/appsettings.json; \
-        fi; \
+        echo "No APPSETTINGS_JSON provided, using default or existing file"; \
     fi
 
 # Build
