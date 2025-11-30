@@ -34,3 +34,4 @@ msbuild.wrn
 
 **/appsettings.json
 !**/appsettings.Development.json
+appsettings.Development.json
