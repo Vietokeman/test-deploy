@@ -1,7 +1,6 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
 EXPOSE 8080
-ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
@@ -24,4 +23,4 @@ RUN API_PROJECT=$(find . -name "*.csproj" | grep -i "Api" | head -n 1) && \
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "Trippio.Api.dll"]
+CMD ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet Trippio.Api.dll
