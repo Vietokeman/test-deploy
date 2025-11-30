@@ -19,6 +19,15 @@ RUN dotnet restore "Trippio.Api/Trippio.Api.csproj"
 # Copy all source code
 COPY src/ .
 
+# Generate appsettings.json from environment variable if provided
+ARG APPSETTINGS_JSON
+RUN if [ -n "$APPSETTINGS_JSON" ]; then \
+        echo "$APPSETTINGS_JSON" > Trippio.Api/appsettings.json; \
+        echo "Generated appsettings.json from environment variable"; \
+    else \
+        echo "No APPSETTINGS_JSON provided, using default or existing file"; \
+    fi
+
 # Build
 WORKDIR "/src/Trippio.Api"
 RUN dotnet build "Trippio.Api.csproj" -c Release -o /app/build
