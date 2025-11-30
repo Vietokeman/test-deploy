@@ -180,10 +180,19 @@ internal class Program
                 ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")!));
            
 
-            // Health Checks
-            builder.Services.AddHealthChecks()
-                .AddSqlServer(connectionString, name: "sql-server")
+            // Health Checks - Support both SQL Server and PostgreSQL
+            var healthChecksBuilder = builder.Services.AddHealthChecks()
                 .AddCheck("self", () => HealthCheckResult.Healthy("API is running"));
+            
+            if (dbProvider.Equals("PostgreSql", StringComparison.OrdinalIgnoreCase) || 
+                dbProvider.Equals("PostgreSQL", StringComparison.OrdinalIgnoreCase))
+            {
+                healthChecksBuilder.AddNpgSql(connectionString, name: "postgresql");
+            }
+            else
+            {
+                healthChecksBuilder.AddSqlServer(connectionString, name: "sql-server");
+            }
 
             // Controllers + System.Text.Json config (enum -> "room"/"show"/"flight")
             builder.Services.AddControllers()
