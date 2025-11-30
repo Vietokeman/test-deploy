@@ -1,0 +1,76 @@
+# Railway Ignore File - Giảm kích thước build
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+**/bin/
+**/obj/
+**/out/
+
+# Logs
+**/Logs/
+**/logs/
+*.log
+
+# Test results
+TestResults/
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Docker files (không cần vì dùng Dockerfile.railway)
+docker-compose*.yml
+Dockerfile
+!Dockerfile.railway
+
+# Scripts không cần thiết
+*.bat
+*.sh
+!deploy-prod.sh
+
+# Node modules (nếu có)
+node_modules/
+package-lock.json
+
+# Environment files
+.env
+.env.*
+!.env.railway
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+
+# Media/uploads (nếu có)
+wwwroot/uploads/
+wwwroot/media/
+
+# Azure specific (không dùng Azure)
+azure-pipelines.yml
+.azure/
+
+# Ngrok
+ngrok-docker/
+
+# Portainer
+portainer_data/
+
+# SQL scripts development
+sql-scripts/dev/

@@ -1,0 +1,114 @@
+using Microsoft.EntityFrameworkCore;
+using Trippio.Core.Domain.Entities;
+using Trippio.Core.Repositories;
+using Trippio.Core.Models;
+using Trippio.Data.SeedWorks;
+
+namespace Trippio.Data.Repositories
+{
+    public class PaymentRepository : RepositoryBase<Payment, Guid>, IPaymentRepository
+    {
+        public PaymentRepository(TrippioDbContext context) : base(context)
+        {
+        }
+
+        // Override GetAllAsync to include Order and Booking navigation properties
+        public override async Task<IEnumerable<Payment>> GetAllAsync()
+        {
+            return await _context.Payments
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Booking)
+                .Include(p => p.Booking)
+                .AsSplitQuery()
+                .OrderByDescending(p => p.PaidAt)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Payment>> GetByUserIdAsync(Guid userId)
+        {
+            // FIXED: Remove null-forgiving operator and use AsSplitQuery to prevent cartesian explosion
+            return await _context.Payments
+                .Where(p => p.UserId == userId)
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Booking)
+                .Include(p => p.Booking)
+                .AsSplitQuery() // Prevents cartesian explosion with multiple includes
+                .OrderByDescending(p => p.PaidAt)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Payment>> GetByOrderIdAsync(int orderId)
+        {
+            return await _context.Payments
+                .Where(p => p.OrderId == orderId)
+                .OrderByDescending(p => p.PaidAt)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Payment>> GetByBookingIdAsync(Guid bookingId)
+        {
+            return await _context.Payments
+                .Where(p => p.BookingId == bookingId)
+                .OrderByDescending(p => p.PaidAt)
+                .ToListAsync();
+        }
+
+        public async Task<Payment?> GetByOrderCodeAsync(long orderCode)
+        {
+            return await _context.Payments
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Booking)
+                .Include(p => p.Booking)
+                .AsSplitQuery()
+                .FirstOrDefaultAsync(p => p.OrderCode == orderCode);
+        }
+
+        public async Task<PageResult<Payment>> GetPagedByUserIdAsync(Guid userId, int pageIndex, int pageSize)
+        {
+            var query = _context.Payments
+                .Where(p => p.UserId == userId)
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Booking)
+                .Include(p => p.Booking)
+                .AsSplitQuery();
+
+            var totalItems = await query.CountAsync();
+            var items = await query.OrderByDescending(p => p.PaidAt)
+                                  .Skip((pageIndex - 1) * pageSize)
+                                  .Take(pageSize)
+                                  .ToListAsync();
+
+            return new PageResult<Payment>
+            {
+                Results = items,
+                RowCount = totalItems,
+                CurrentPage = pageIndex,
+                PageSize = pageSize
+            };
+        }
+
+        public async Task<IEnumerable<Payment>> GetByDateRangeAsync(DateTime from, DateTime to)
+        {
+            return await _context.Payments
+                .Where(p => p.PaidAt >= from && p.PaidAt <= to)
+                .Include(p => p.Order)
+                    .ThenInclude(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Booking)
+                .Include(p => p.Booking)
+                .AsSplitQuery()
+                .OrderByDescending(p => p.PaidAt)
+                .ToListAsync();
+        }
+
+        public async Task<decimal> GetTotalPaymentAmountAsync(DateTime from, DateTime to)
+        {
+            return await _context.Payments
+                .Where(p => p.PaidAt >= from && p.PaidAt <= to)
+                .SumAsync(p => p.Amount);
+        }
+    }
+}

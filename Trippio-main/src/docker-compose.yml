@@ -1,0 +1,115 @@
+services:
+  # Database section
+  trippio-sqlserver:
+    image: mcr.microsoft.com/mssql/server:2017-latest
+    container_name: trippio-sqlserver
+    environment:
+      - SA_PASSWORD=Strong!Pass123
+      - ACCEPT_EULA=Y
+    ports:
+      - "14333:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - trippio_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P Strong!Pass123 -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  # Redis (for Basket, Idempotency, etc.)
+  redis:
+    image: redis:7.2
+    container_name: trippio-redis
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --requirepass StrongRedisPass123!
+      --maxmemory-policy allkeys-lru
+    environment:
+      - REDIS_PASSWORD=StrongRedisPass123!
+    ports:
+      - "6379:6379"           # expose để debug từ host; có thể bỏ nếu không cần
+    volumes:
+      - redis_data:/data
+    networks:
+      - trippio_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "StrongRedisPass123!", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Optional UI quản trị Redis
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: trippio-redisinsight
+    ports:
+      - "8001:8001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - trippio_network
+    restart: unless-stopped
+
+  # Infrastructure section
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: trippio-portainer
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - portainer_data:/data
+    networks:
+      - trippio_network
+    restart: unless-stopped
+  # API section
+  trippio.api:
+    image: ${DOCKER_REGISTRY-}trippio-api:${PLATFORM:-linux}-${TAG:-latest}
+    container_name: trippio-api
+    build:
+      context: .
+      dockerfile: Trippio.Api/Dockerfile
+    environment:
+      - DOTNET_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:7142
+      - ConnectionStrings__DefaultConnection=Server=trippio-sqlserver,1433;Database=TrippioDb;User Id=sa;Password=Strong!Pass123;Encrypt=False;TrustServerCertificate=True;MultipleActiveResultSets=true;    
+      - ConnectionStrings__Redis=redis:6379,password=StrongRedisPass123!,abortConnect=false,ssl=false
+    ports:
+      - "7142:7142"
+    depends_on:
+      trippio-sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - trippio_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:7142/swagger || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+# Network section
+networks:
+  trippio_network:
+    name: trippio_network
+    driver: bridge
+
+# Volumes section
+volumes:
+  sqlserver_data:
+    name: trippio_sqlserver_data
+  portainer_data:
+    name: trippio_portainer_data
+  redis_data:
+    name: trippio_redis_data
