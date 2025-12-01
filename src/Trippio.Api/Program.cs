@@ -53,16 +53,10 @@ internal class Program
 
             var builder = WebApplication.CreateBuilder(args);
             
-            // ===== RAILWAY PORT CONFIGURATION =====
-            // Railway provides PORT via environment variable, we MUST use it
+            // Railway automatically sets ASPNETCORE_URLS via Dockerfile ENV
+            // No need to configure Kestrel manually - ASP.NET will read from ENV
             var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-            builder.WebHost.ConfigureKestrel(serverOptions =>
-            {
-                // Listen on 0.0.0.0 (all interfaces) NOT localhost
-                // This is CRITICAL for Railway to route traffic to your app
-                serverOptions.ListenAnyIP(int.Parse(port));
-            });
-            Log.Information($"Configured to listen on 0.0.0.0:{port}");
+            Log.Information($"Railway PORT: {port} (listening via ASPNETCORE_URLS=http://0.0.0.0:{port})");
             
             var configuration = builder.Configuration;
             var connectionString = configuration.GetConnectionString("DefaultConnection");

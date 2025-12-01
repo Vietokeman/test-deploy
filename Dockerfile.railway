@@ -1,41 +1,29 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
-# Railway will provide PORT via env var - we expose it here for documentation
+# Documented port - Railway injects PORT env-var
 EXPOSE 8080
 ENV ASPNETCORE_ENVIRONMENT=Production
-# Disable HTTPS redirection in Production (Railway handles SSL at edge)
-ENV ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+# CRITICAL: Listen on 0.0.0.0 and use PORT from Railway
+ENV ASPNETCORE_URLS=http://0.0.0.0:${PORT:-8080}
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
-COPY src/ .
-
-# Find and restore the API project
-RUN API_PROJECT=$(find . -name "*.csproj" | grep -i "Api" | head -n 1) && \
+COPY . .
+# Find API project and publish
+RUN API_PROJECT=$(find . -name "*Api.csproj" | head -n 1) && \
     echo "Found API project: $API_PROJECT" && \
-    dotnet restore "$API_PROJECT"
-
-# Build the project
-RUN API_PROJECT=$(find . -name "*.csproj" | grep -i "Api" | head -n 1) && \
-    dotnet build "$API_PROJECT" -c Release -o /app/build
-
-FROM build AS publish
-# Publish the application
-RUN API_PROJECT=$(find . -name "*.csproj" | grep -i "Api" | head -n 1) && \
     dotnet publish "$API_PROJECT" -c Release -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
-# Install curl for Railway health checks
+# Install curl for health checks
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Health check endpoint - Railway will use this
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:${PORT:-8080}/health || exit 1
 
-# CRITICAL: Use PORT from Railway environment variable
-# Listen on 0.0.0.0 (all interfaces) so Railway can route traffic
-ENV ASPNETCORE_URLS=http://0.0.0.0:${PORT}
+# Use exec form CMD - cleaner and Railway-friendly
 CMD ["dotnet", "Trippio.Api.dll"]
